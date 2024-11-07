@@ -1,16 +1,24 @@
+#character.py
 import pygame
 import os
+from projectile import Projectile
 
-class Character():
-    def __init__(self, x, y):
-        # Correct the path to the idle image
-        image_path = os.path.join("D:\\", "Hworld", "Python", "Arcatime", "assets", "images", "sprites", "jake", "idle.png")
-        
-        # Load the idle image
-        self.idle_image = pygame.image.load(image_path).convert_alpha()
-        self.rect = self.idle_image.get_rect(topleft=(x, y))
-        
-        # Other attributes
+class Character:
+    def __init__(self, x, y, character_name, controls):
+        super().__init__()
+        self.x = x
+        self.y = y
+        self.character_name = character_name
+        self.controls = controls
+        self.projectiles = []
+
+        # Load idle and walking images
+        self.idle_image = self.load_image(f"idle.png")
+        self.walk_images = [self.load_image(f"walk-{i}.png") for i in range(1, 7)]
+        self.current_image = self.idle_image
+        self.rect = self.current_image.get_rect(topleft=(x, y))
+
+        # Initialize other attributes
         self.vel_y = 0
         self.jump = False
         self.attacking = False
@@ -18,100 +26,139 @@ class Character():
         self.health = 100
         self.target_health = 100
         self.attack_cooldown = 0
+        self.anim_index = 0
+        self.anim_cooldown = 5
+        self.anim_timer = 0
+        self.direction = 1  # Default direction (right)
+
+    def load_image(self, filename):
+        """ Helper method to load images with path construction """
+        path = os.path.join("assets", "images", "character", self.character_name, filename)
+        return pygame.image.load(path).convert_alpha()
+
+    def shoot(self):
+        """ Create a projectile when the character shoots """
+        projectile = Projectile(
+            self.rect.centerx, 
+            self.rect.centery, 
+            self.direction
+        )
+        self.projectiles.append(projectile)
+
+    def take_damage(self, amount=5):
+        """ Decrease health by a specified amount """
+        self.target_health -= amount
+        if self.target_health < 0:
+            self.target_health = 0
 
     def move(self, screen_width, screen_height, surface, target):
+        """ Handle movement, jumping, gravity, and attacking logic """
         SPEED = 5
         GRAVITY = 2
-        dx = 0
-        dy = 0
+        dx, dy = 0, 0
 
-        # Key press
         key = pygame.key.get_pressed()
 
-        # Perform actions only if not currently attacking or on cooldown
-        if not self.attacking and self.attack_cooldown == 0:
-            # Movement
-            if key[pygame.K_a]:  # Move left
-                dx = -SPEED
-            if key[pygame.K_d]:  # Move right
-                dx = SPEED
+        # Handle movement regardless of attack state
+        if key[self.controls["move_left"]]:
+            dx = -SPEED
+            self.direction = -1
+        if key[self.controls["move_right"]]:
+            dx = SPEED
+            self.direction = 1
 
-            # Attack
-            if key[pygame.K_r] or key[pygame.K_t]:
-                self.attacking = True
-                self.attack(surface, target)
-
-                # Skill 1
-                if key[pygame.K_r]:
-                    self.attack_type = 1
-                # Skill 2
-                if key[pygame.K_t]:
-                    self.attack_type = 2
-
-        # Jump
-        if key[pygame.K_w] and not self.jump:  # Jump
+        if key[self.controls["jump"]] and not self.jump:
             self.vel_y = -25
             self.jump = True
 
-        # Gravity
+        # Gravity and vertical movement
         self.vel_y += GRAVITY
         dy += self.vel_y
 
-        # Character stays within screen boundaries
+        # Keep the character within screen boundaries
         if self.rect.left + dx < 0:
             dx = -self.rect.left
         if self.rect.right + dx > screen_width:
             dx = screen_width - self.rect.right
-        if self.rect.bottom + dy > screen_height - 40:  # Assume a ground level at 40 pixels from the bottom
+        if self.rect.bottom + dy > screen_height - 40:
             self.vel_y = 0
             self.jump = False
             dy = screen_height - 40 - self.rect.bottom
 
-        # Update player position
+        # Update the character's position
         self.rect.x += dx
         self.rect.y += dy
 
-        # Update health gradually
+        # Update health and attack cooldown
         self.update_health()
-
-        # Reduce cooldown timer
         if self.attack_cooldown > 0:
             self.attack_cooldown -= 1
 
+        # Update animation frame based on movement
+        if dx != 0:
+            self.anim_timer += 1
+            if self.anim_timer >= self.anim_cooldown:
+                self.anim_timer = 0
+                self.anim_index = (self.anim_index + 1) % len(self.walk_images)
+            self.current_image = self.walk_images[self.anim_index]
+        else:
+            self.current_image = self.idle_image
+
+        # Handle projectile movement and collisions
+        for projectile in self.projectiles:
+            projectile.move()
+            projectile.draw(surface)
+            if projectile.rect.colliderect(target.rect):
+                target.take_damage()  # Handle damage to the target
+                projectile.active = False
+
+        # Remove inactive projectiles
+        self.projectiles = [p for p in self.projectiles if p.active]
+
+    def draw_projectiles(self, surface):
+        """ Draw all active projectiles """
+        for projectile in self.projectiles:
+            projectile.draw(surface)
+
     def attack(self, surface, target):
-        # Create an attacking rectangle area to detect collision
-        attacking_rect = pygame.Rect(self.rect.centerx, self.rect.y, self.rect.width, self.rect.height)
+        """ Handle the attack logic and projectiles """
+        if self.attack_cooldown == 0:
+            direction = 1 if target.rect.x > self.rect.x else -1
+            projectile = Projectile(self.rect.centerx, self.rect.centery, direction)
+            self.projectiles.append(projectile)
+            self.attack_cooldown = 20  # Reset attack cooldown
 
-        # Only decrease target's health if attack collides with target
-        if attacking_rect.colliderect(target.rect):
-            target.target_health -= 10  # Reduce target health only on hit
+        for projectile in self.projectiles:
+            projectile.move()
+            projectile.draw(surface)
+            if projectile.rect.colliderect(target.rect):
+                target.take_damage()  # Handle damage to the target
+                projectile.active = False
 
-        # Draw the attack rectangle for visual feedback
-        pygame.draw.rect(surface, (0, 255, 0), attacking_rect)
-
-        # Set cooldown after each attack
-        self.attack_cooldown = 20  # Adjust cooldown time as needed
-        self.attacking = False  # Reset attacking state immediately
+        self.projectiles = [p for p in self.projectiles if p.active]
 
     def update_health(self):
-        # Gradually decrease health until it reaches target_health
+        """ Gradually decrease health towards target health """
         if self.health > self.target_health:
-            self.health -= 0.5  # Adjust speed of decrease as needed
+            self.health -= 0.5
+        if self.target_health <= 0:
+            self.health = 0
 
     def draw(self, surface):
-        scale_factor = 2  # Adjust this value to increase/decrease size while keeping position constant
-        new_width = int(self.idle_image.get_width() * scale_factor)  # Scale width
-        new_height = int(self.idle_image.get_height() * scale_factor)  # Scale height
-        
-        # Create a scaled version of the image
-        scaled_image = pygame.transform.scale(self.idle_image, (new_width, new_height))
-        
-        # Calculate the new position to keep the character centered
+        """ Draw the character on the screen """
+        scale_factor = 2
+        new_width = int(self.current_image.get_width() * scale_factor)
+        new_height = int(self.current_image.get_height() * scale_factor)
+
+        # Scale and position the character's image
+        scaled_image = pygame.transform.scale(self.current_image, (new_width, new_height))
         new_x = self.rect.x - (new_width - self.rect.width) // 2
         new_y = self.rect.y - (new_height - self.rect.height) // 2
-        
-        # Draw the scaled image at the new position
         surface.blit(scaled_image, (new_x, new_y))
-        
-        # Update rect to the new scaled dimensions for collision detection
+
+        # Update the character's rect for collision detection
         self.rect = scaled_image.get_rect(center=(new_x + new_width // 2, new_y + new_height // 2))
+
+    def is_dead(self):
+        """ Check if the character is dead """
+        return self.health <= 0

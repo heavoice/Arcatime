@@ -1,7 +1,8 @@
+# settings.py
 # Game window settings
 SCREEN_WIDTH = 700
 SCREEN_HEIGHT = 500
-FPS = 60 
+FPS = 30 
 
 # Colors
 RED = (255, 0, 0)
