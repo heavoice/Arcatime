@@ -11,3 +11,6 @@ WHITE = (255, 255, 255)
 
 # Background image path
 BACKGROUND_IMAGE_PATH = 'assets/images/background/background.png'
+
+# Game icon
+GAME_ICON = 'assets/images/arcatime.ico'

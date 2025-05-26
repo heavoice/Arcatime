@@ -3,14 +3,17 @@ import pygame
 import os
 
 class Projectile:
-    def __init__(self, x, y, direction):
+    def __init__(self, x, y, direction, owner):
         self.x = x
         self.y = y
         self.direction = direction
         self.width = 10
         self.height = 5
         self.active = True
-        self.image = pygame.Surface((self.width, self.height))  # Dummy projectile image
+        if owner == "character1":
+            self.image = pygame.image.load(os.path.join("assets", "images", "projectile", "projectile01.png")).convert_alpha()
+        elif owner == "character2":
+            self.image = pygame.image.load(os.path.join("assets", "images", "projectile", "projectile02.png")).convert_alpha()
         self.rect = self.image.get_rect(center=(x, y))
 
     def move(self):
@@ -23,4 +26,4 @@ class Projectile:
 
     def draw(self, surface):
         if self.active:
-            pygame.draw.rect(surface, (255, 0, 0), self.rect)  # Red colored projectile
+            surface.blit(self.image, self.rect)

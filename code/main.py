@@ -1,7 +1,7 @@
 # main.py
 import pygame
 from character import Character
-from settings import SCREEN_WIDTH, SCREEN_HEIGHT, FPS, WHITE, YELLOW, RED, BACKGROUND_IMAGE_PATH
+from settings import SCREEN_WIDTH, SCREEN_HEIGHT, FPS, WHITE, YELLOW, RED, BACKGROUND_IMAGE_PATH, GAME_ICON
 
 pygame.init()
 
@@ -25,6 +25,8 @@ controls_player2 = {
 # Game window
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption('Arcatime')
+icon = pygame.image.load(GAME_ICON)
+pygame.display.set_icon(icon)
 
 # Set frame rate
 clock = pygame.time.Clock()
@@ -41,7 +43,7 @@ def background():
 def health(current_health, target_health, x, y):
     max_width = 200  # Maximum width of the health bar
     health_width = int(max_width * (current_health / 100))  
-    target_width = int(max_width * (target_health / 100))  
+     
 
     pygame.draw.rect(screen, WHITE, (x - 2, y - 2, max_width + 4, 34), 2)  # Draw white outline
     pygame.draw.rect(screen, YELLOW, (x, y, max_width, 30))  # Full bar in yellow
@@ -53,8 +55,8 @@ def health(current_health, target_health, x, y):
     return current_health
 
 # Create instances of Character with respective controls
-character_1 = Character(150, 310, character_name="character1", controls=controls_player1)
-character_2 = Character(525, 310, character_name="character2", controls=controls_player2)
+character_1 = Character(150, 310, character_name="character1", controls=controls_player1, facing_left=False)
+character_2 = Character(525, 310, character_name="character2", controls=controls_player2, facing_left=True)
 
 # Game loop
 run = True

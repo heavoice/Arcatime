@@ -4,18 +4,21 @@ import os
 from projectile import Projectile
 
 class Character:
-    def __init__(self, x, y, character_name, controls):
+    def __init__(self, x, y, character_name, controls, facing_left):
         super().__init__()
         self.x = x
         self.y = y
         self.character_name = character_name
         self.controls = controls
         self.projectiles = []
+        
 
         # Load idle and walking images
-        self.idle_image = self.load_image(f"idle.png")
-        self.walk_images = [self.load_image(f"walk-{i}.png") for i in range(1, 7)]
-        self.current_image = self.idle_image
+        self.idle_l_image = self.load_image("idle-l.png")
+        self.idle_r_image = self.load_image("idle-r.png")
+        self.walk_r_images = [self.load_image(f"walk-r-{i}.png") for i in range(1, 7)]
+        self.walk_l_images = [self.load_image(f"walk-l-{i}.png") for i in range(1, 7)]
+        self.current_image = self.idle_l_image if facing_left else self.idle_r_image
         self.rect = self.current_image.get_rect(topleft=(x, y))
 
         # Initialize other attributes
@@ -30,20 +33,12 @@ class Character:
         self.anim_cooldown = 5
         self.anim_timer = 0
         self.direction = 1  # Default direction (right)
+        self.facing_left = facing_left
 
     def load_image(self, filename):
         """ Helper method to load images with path construction """
         path = os.path.join("assets", "images", "character", self.character_name, filename)
         return pygame.image.load(path).convert_alpha()
-
-    def shoot(self):
-        """ Create a projectile when the character shoots """
-        projectile = Projectile(
-            self.rect.centerx, 
-            self.rect.centery, 
-            self.direction
-        )
-        self.projectiles.append(projectile)
 
     def take_damage(self, amount=5):
         """ Decrease health by a specified amount """
@@ -62,10 +57,10 @@ class Character:
         # Handle movement regardless of attack state
         if key[self.controls["move_left"]]:
             dx = -SPEED
-            self.direction = -1
+            self.direction = -1  # Set direction to left
         if key[self.controls["move_right"]]:
             dx = SPEED
-            self.direction = 1
+            self.direction = 1  # Set direction to right
 
         if key[self.controls["jump"]] and not self.jump:
             self.vel_y = -25
@@ -96,13 +91,23 @@ class Character:
 
         # Update animation frame based on movement
         if dx != 0:
+            self.facing_left = self.direction == -1  # Update arah pandang berdasarkan arah gerak
             self.anim_timer += 1
             if self.anim_timer >= self.anim_cooldown:
                 self.anim_timer = 0
-                self.anim_index = (self.anim_index + 1) % len(self.walk_images)
-            self.current_image = self.walk_images[self.anim_index]
+                self.anim_index = (self.anim_index + 1) % len(self.walk_l_images)
+
+            if self.direction == -1:  # Moving left
+                self.current_image = self.walk_l_images[self.anim_index]
+            else:  # Moving right
+                self.current_image = self.walk_r_images[self.anim_index]
         else:
-            self.current_image = self.idle_image
+            if self.direction == -1:
+                self.current_image = self.idle_l_image
+            else:
+                self.current_image = self.idle_r_image
+
+
 
         # Handle projectile movement and collisions
         for projectile in self.projectiles:
@@ -122,11 +127,17 @@ class Character:
 
     def attack(self, surface, target):
         """ Handle the attack logic and projectiles """
+        self.direction = -1 if self.facing_left else 1
         if self.attack_cooldown == 0:
-            direction = 1 if target.rect.x > self.rect.x else -1
-            projectile = Projectile(self.rect.centerx, self.rect.centery, direction)
+            offset_x = 30 if self.direction == 1 else -30
+            projectile = Projectile(
+                self.rect.centerx + offset_x,
+                self.rect.centery + 10,
+                self.direction,
+                self.character_name
+            )
             self.projectiles.append(projectile)
-            self.attack_cooldown = 20  # Reset attack cooldown
+            self.attack_cooldown = 20
 
         for projectile in self.projectiles:
             projectile.move()
@@ -144,19 +155,27 @@ class Character:
         if self.target_health <= 0:
             self.health = 0
 
-    def draw(self, surface):
+    def draw(self, screen):
         """ Draw the character on the screen """
         scale_factor = 2
         new_width = int(self.current_image.get_width() * scale_factor)
         new_height = int(self.current_image.get_height() * scale_factor)
 
-        # Scale and position the character's image
-        scaled_image = pygame.transform.scale(self.current_image, (new_width, new_height))
+        # Tentukan apakah perlu di-flip
+        flip = self.direction == -1
+        if self.facing_left:
+            flip = not flip  # Balik logika jika default menghadap kiri
+
+        # Flip horizontal jika perlu
+        image_to_draw = pygame.transform.flip(self.current_image, flip, False)
+
+        # Scale dan gambar
+        scaled_image = pygame.transform.scale(image_to_draw, (new_width, new_height))
         new_x = self.rect.x - (new_width - self.rect.width) // 2
         new_y = self.rect.y - (new_height - self.rect.height) // 2
-        surface.blit(scaled_image, (new_x, new_y))
+        screen.blit(scaled_image, (new_x, new_y))
 
-        # Update the character's rect for collision detection
+        # Update rect
         self.rect = scaled_image.get_rect(center=(new_x + new_width // 2, new_y + new_height // 2))
 
     def is_dead(self):
